@@ -1,230 +1,129 @@
-/*! echo-js v1.7.3 | (c) 2016 @toddmotto | https://github.com/toddmotto/echo */
-(function(root, factory) {
-  if (typeof define === 'function' && define.amd) {
-    define(function() {
-      return factory(root);
-    });
-  } else if (typeof exports === 'object') {
-    module.exports = factory;
-  } else {
-    root.echo = factory(root);
-  }
-})(this, function(root) {
-
-  'use strict';
-
-  var echo = {};
-
-  var callback = function() {};
-
-  var offset, poll, delay, useDebounce, unload;
-
-  var isHidden = function(element) {
-    return (element.offsetParent === null);
-  };
-
-  var inView = function(element, view) {
-    if (isHidden(element)) {
-      return false;
-    }
-
-    var box = element.getBoundingClientRect();
-    return (box.right >= view.l && box.bottom >= view.t && box.left <= view.r && box.top <= view.b);
-  };
-
-  var debounceOrThrottle = function() {
-    if (!useDebounce && !!poll) {
-      return;
-    }
-    clearTimeout(poll);
-    poll = setTimeout(function() {
-      echo.render();
-      poll = null;
-    }, delay);
-  };
-
-  echo.init = function(opts) {
-    opts = opts || {};
-    var offsetAll = opts.offset || 0;
-    var offsetVertical = opts.offsetVertical || offsetAll;
-    var offsetHorizontal = opts.offsetHorizontal || offsetAll;
-    var optionToInt = function(opt, fallback) {
-      return parseInt(opt || fallback, 10);
-    };
-    offset = {
-      t: optionToInt(opts.offsetTop, offsetVertical),
-      b: optionToInt(opts.offsetBottom, offsetVertical),
-      l: optionToInt(opts.offsetLeft, offsetHorizontal),
-      r: optionToInt(opts.offsetRight, offsetHorizontal)
-    };
-    delay = optionToInt(opts.throttle, 250);
-    useDebounce = opts.debounce !== false;
-    unload = !!opts.unload;
-    callback = opts.callback || callback;
-    echo.render();
-    if (document.addEventListener) {
-      root.addEventListener('scroll', debounceOrThrottle, false);
-      root.addEventListener('load', debounceOrThrottle, false);
-    } else {
-      root.attachEvent('onscroll', debounceOrThrottle);
-      root.attachEvent('onload', debounceOrThrottle);
-    }
-  };
-
-  echo.render = function() {
-    var nodes = document.querySelectorAll('img[data-echo], [data-echo-background]');
-    var length = nodes.length;
-    var src, elem;
-    var view = {
-      l: 0 - offset.l,
-      t: 0 - offset.t,
-      b: (root.innerHeight || document.documentElement.clientHeight) + offset.b,
-      r: (root.innerWidth || document.documentElement.clientWidth) + offset.r
-    };
-    for (var i = 0; i < length; i++) {
-      elem = nodes[i];
-      if (inView(elem, view)) {
-
-        if (unload) {
-          elem.setAttribute('data-echo-placeholder', elem.src);
-        }
-
-        if (elem.getAttribute('data-echo-background') !== null) {
-          elem.style.backgroundImage = "url(" + elem.getAttribute('data-echo-background') + ")";
-        } else {
-          elem.src = elem.getAttribute('data-echo');
-        }
-
-        if (!unload) {
-          elem.removeAttribute('data-echo');
-          elem.removeAttribute('data-echo-background');
-        }
-
-        callback(elem, 'load');
-      } else if (unload && !!(src = elem.getAttribute('data-echo-placeholder'))) {
-
-        if (elem.getAttribute('data-echo-background') !== null) {
-          elem.style.backgroundImage = "url(" + src + ")";
-        } else {
-          elem.src = src;
-        }
-
-        elem.removeAttribute('data-echo-placeholder');
-        callback(elem, 'unload');
-      }
-    }
-    if (!length) {
-      echo.detach();
-    }
-  };
-
-  echo.detach = function() {
-    if (document.removeEventListener) {
-      root.removeEventListener('scroll', debounceOrThrottle);
-    } else {
-      root.detachEvent('onscroll', debounceOrThrottle);
-    }
-    clearTimeout(poll);
-  };
-
-  return echo;
-
-});
-function deepCopy(c, p) {
-　var c = c || {};
-　for (var i in p) {
-　　if (typeof p[i] === 'object') {
-　　　c[i] = (p[i].constructor === Array) ? [] : {};
-　　　deepCopy(p[i], c[i]);
-　　} else {
-　　　c[i] = p[i];
-　　}
-　}
-　return c;
+// 滚动到指定元素
+function scrollToElement(target, offset) {
+  var scroll_offset = $(target).offset();
+  $('body,html').animate({
+    scrollTop: scroll_offset.top + (offset || 0),
+    easing: 'swing',
+  });
 }
-/**
- * 网站js
- * @author Jelon
- * @type {{init, toggleMenu}}
- */
-var JELON = window.JELON || {};
-JELON = deepCopy(JELON, {
-  name: 'JELON',
-  version: '0.0.2',
-  init: function() {
-    this.toggleMenu();
-    this.backToTop();
 
-    echo.init({
-      offset: 50,
-      throttle: 250,
-      unload: false,
-      callback: function(element, op) {
-        console.log(element, 'has been', op + 'ed')
-      }
-    });
-    this.initSearch();
-  },
-  $: function(str) {
-    return /^(\[object HTML)[a-zA-Z]*(Element\])$/.test(Object.prototype.toString.call(str)) ? str : document.getElementById(str);
-  },
-  toggleMenu: function() {
-    var _this = this,
-      $menu = _this.$(_this.name + '__menu');
-    _this.$(_this.name + '__btnDropNav').onclick = function() {
-      if ($menu.className.indexOf('hidden') === -1) {
-        $menu.className += ' hidden';
-      } else {
-        $menu.className = $menu.className.replace(/\s*hidden\s*/, '');
-      }
+// 防抖动函数
+function debounce(func, wait, immediate) {
+  var timeout;
+  return function () {
+    var context = this, args = arguments;
+    var later = function () {
+      timeout = null;
+      if (!immediate) func.apply(context, args);
+    };
+    var callNow = immediate && !timeout;
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+    if (callNow) func.apply(context, args);
+  };
+}
 
-    };
-  },
-  backToTop: function() {
-    var _this = this;
-    if (typeof _this.$(_this.name + '__backToTop') === 'undefined') return;
-    window.onscroll = window.onresize = function() {
-      if (document.documentElement.scrollTop + document.body.scrollTop > 0) {
-        _this.$(_this.name + '__backToTop').style.display = 'block';
-      } else {
-        _this.$(_this.name + '__backToTop').style.display = 'none';
-      }
-    };
-    _this.$(_this.name + '__backToTop').onclick = function() {
-      var Timer = setInterval(GoTop, 10);
-
-      function GoTop() {
-        if (document.documentElement.scrollTop + document.body.scrollTop < 1) {
-          clearInterval(Timer)
-        } else {
-          document.documentElement.scrollTop /= 1.1;
-          document.body.scrollTop /= 1.1
-        }
-      }
-    };
-  },
-  initSearch: function () {
-    var _this = this;
-    if (document.getElementById('searchKeyword') && document.getElementById('searchButton')) {
-      document.getElementById('searchKeyword').onkeyup = function (e) {
-        var e = e || window.event
-        var keyCode = e.keyCode || e.which
-        if (keyCode === 13) {
-          _this.startSearch();
-        }
-      }
-      document.getElementById('searchButton').onclick = _this.startSearch;
-    }
-  },
-  startSearch: function () {
-    if (document.getElementById('searchKeyword').value) {
-      document.getElementById('searchKeywordHidden').value = 'site:jelon.info ' + document.getElementById('searchKeyword').value;
-      document.getElementById('searchForm').submit();
-    }
+// 顶部菜单的监听事件
+function navbarScrollEvent() {
+  var navbar = $('#navbar');
+  if (navbar.offset().top > 0) {
+    navbar.addClass('navbar-custom');
+    navbar.removeClass('navbar-dark');
   }
-});
+  $(window).scroll(debounce(function () {
+    $('.scrolling-navbar')[navbar.offset().top > 50 ? 'addClass' : 'removeClass']('top-nav-collapse');
+    if (navbar.offset().top > 0) {
+      navbar.addClass('navbar-custom');
+      navbar.removeClass('navbar-dark');
+    } else {
+      navbar.addClass('navbar-dark');
+    }
+  }, 20));
+  $('#navbar-toggler-btn').on('click', function () {
+    $('.animated-icon').toggleClass('open');
+    $('#navbar').toggleClass('navbar-col-show');
+  });
+}
 
-/**
- * 程序入口
- */
-JELON.init();
+// 头图视差的监听事件
+function parallaxEvent() {
+  var target = $('#background[parallax="true"]');
+  var parallax = function () {
+    var oVal = $(window).scrollTop() / 5;
+    var offset = parseInt($('#board').css('margin-top'));
+    var max = 96 + offset;
+    if (oVal > max) {
+      oVal = max;
+    }
+    target.css({
+      transform: 'translate3d(0,' + oVal + 'px,0)',
+      '-webkit-transform': 'translate3d(0,' + oVal + 'px,0)',
+      '-ms-transform': 'translate3d(0,' + oVal + 'px,0)',
+      '-o-transform': 'translate3d(0,' + oVal + 'px,0)',
+    });
+
+    var toc = $('#toc');
+    if (toc) {
+      $('#toc-ctn').css({
+        'padding-top': oVal + 'px',
+      });
+    }
+  };
+  if (target.length > 0) {
+    parallax();
+    $(window).scroll(parallax);
+  }
+}
+
+// 向下滚动箭头的监听事件
+function scrollDownArrowEvent() {
+  $('.scroll-down-bar').on('click', function () {
+    scrollToElement('#board', -$('#navbar').height());
+  });
+}
+
+// 向顶部滚动箭头的监听事件
+function scrollTopArrowEvent() {
+  var topArrow = $('#scroll-top-button');
+  if (!topArrow) {
+    return;
+  }
+  var posDisplay = false;
+  var scrollDisplay = false;
+  // 位置
+  var setTopArrowPos = function () {
+    var boardRight = document.getElementById('board').getClientRects()[0].right;
+    var bodyWidth = document.body.offsetWidth;
+    var right = bodyWidth - boardRight;
+    posDisplay = right >= 50;
+    topArrow.css({
+      'bottom': posDisplay && scrollDisplay ? '20px' : '-60px',
+      'right': right - 64 + 'px',
+    });
+  };
+  setTopArrowPos();
+  $(window).resize(setTopArrowPos);
+  // 显示
+  var headerHeight = $('#board').offset().top;
+  $(window).scroll(debounce(function () {
+    var scrollHeight = document.body.scrollTop + document.documentElement.scrollTop;
+    scrollDisplay = scrollHeight >= headerHeight;
+    topArrow.css({
+      'bottom': posDisplay && scrollDisplay ? '20px' : '-60px',
+    });
+  }, 20));
+  // 点击
+  topArrow.on('click', function () {
+    $('body,html').animate({
+      scrollTop: 0,
+      easing: 'swing',
+    });
+  });
+}
+
+$(document).ready(function () {
+  navbarScrollEvent();
+  parallaxEvent();
+  scrollDownArrowEvent();
+  scrollTopArrowEvent();
+});
